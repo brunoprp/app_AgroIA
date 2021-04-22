@@ -9,15 +9,20 @@ import matplotlib.pyplot as plt
 import cv2
 import numpy as np
 import os
-from flask import Flask, flash, request, redirect, url_for, send_from_directory, render_template_string, send_file
+from flask import Flask, flash, request, redirect, url_for, send_from_directory, render_template_string, send_file, render_template
+
 from werkzeug.utils import secure_filename
 import tensorflow as tf
 
-def imagePreprocessing(pathImage):
+
+
+
+
+def imagePreprocessing(pathImage, caminho_model):
     """Retorna o resultado da classificação"""
     
-    filepath = "tflite_models/normaXdoente_model_quant.tflite"
-    interpreter_quant = tf.lite.Interpreter(model_path=filepath)
+    
+    interpreter_quant = tf.lite.Interpreter(model_path=caminho_model)
     interpreter_quant.allocate_tensors()
     input_index = interpreter_quant.get_input_details()[0]["index"]
     output_index = interpreter_quant.get_output_details()[0]["index"]
@@ -50,6 +55,7 @@ ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
 
 folder_temp = "arquivos/temperatura.txt"
 
+
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -62,17 +68,19 @@ def add_header(response):
 
 @app.route('/')
 def rootPage():
-    return '''<!doctype html>
-    <title>Upload new File</title>
-    <h1>Upload new File</h1>
-    <form method=post action='/predictFile' enctype=multipart/form-data>
-      <input type=file name=file>
-      <input type=submit value=Upload>
-    </form>
-    '''
-
+   
+    
+   return render_template("index.html")
+   
+   
+   
 @app.route('/predictFile', methods=['GET', 'POST'])
 def uploadFile():
+    
+    
+    model_1 = "tflite_models/normaXdoente_model_quant.tflite"
+    model_2 = "tflite_models/3_doencas_model_quant.tflite"
+    
     if request.method == 'POST':
         # check if the post request has the file part
         if 'file' not in request.files:
@@ -91,32 +99,46 @@ def uploadFile():
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            result_classifica = imagePreprocessing('./imgs/' + file.filename)
+            result_classifica = imagePreprocessing('./imgs/' + file.filename, model_1)
             
-            text_file = open(folder_temp, "w")
-            text_file.write(str(result_classifica))
-            text_file.close()
             
-            return redirect(url_for('uploadedFile'))
+            if result_classifica[1] == 0:
+                
+                return  render_template("classifica_model_1.html", 
+                                        classe = "Normal", percet_certeza =  int(100*result_classifica[0]))
+            
+            else:
+                
+                result_classifica = imagePreprocessing('./imgs/' + file.filename, model_2)
+                
+                if result_classifica[1] == 0:
+                    classe = "Doeça não indeficada"
+                if result_classifica[1] == 1:
+                    classe = "Ferrugem normal"
+                else:
+                    classe = "Mancha de folha cinza"
+                
+                return render_template("classifica_model_2.html",
+                                       classe = classe, 
+                                       percet_certeza = int(100*result_classifica[0]))
+                
+            #text_file = open(folder_temp, "w")
+            #text_file.write(str(result_classifica))
+            #text_file.close()
+            
+           # return redirect(url_for('uploadedFile'))
 
-    return '''<!doctype html>
-    <title>Upload new File</title>
-    <h1>Upload new erro File</h1>
-    <form method=post action='/predictFile' enctype=multipart/form-data>
-      <input type=file name=file>
-      <input type=submit value=Upload>
-    </form>
+    return render_template("predictFile.html") 
     
-    '''
 
 @app.route('/uploadedFile', methods=['GET', 'POST'])
 def uploadedFile():
     #Lendo dos valores de temperatura salvos no aquivo txt
     temp = open(folder_temp, "r")
-    dados_temp1 = str(temp.read())
+    result_class = str(temp.read())
     temp.close()
     
-    return str(dados_temp1)
+    return  render_template("classifica.html", result_class = result_class)
 
 
 if __name__ == '__main__':
