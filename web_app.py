@@ -49,7 +49,7 @@ def imagePreprocessing(pathImage, caminho_model):
     return [voalor_certeza, classe]
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = './imgs/'
+app.config['UPLOAD_FOLDER'] = './static/img/'
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'}
 
 
@@ -71,6 +71,10 @@ def rootPage():
    
     
    return render_template("index.html")
+
+@app.route('/demo')
+def demo():
+    return render_template("demo.html")
    
    
    
@@ -98,18 +102,22 @@ def uploadFile():
         
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
+            
+            caminho_imagem = './static/img/' + file.filename
+            
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            result_classifica = imagePreprocessing('./imgs/' + file.filename, model_1)
+            result_classifica = imagePreprocessing('./static/img/' + file.filename, model_1)
             
             
             if result_classifica[1] == 0:
                 
                 return  render_template("classifica_model_1.html", 
-                                        classe = "Normal", percet_certeza =  int(100*result_classifica[0]))
+                                        classe = "Normal", percet_certeza =  int(100*result_classifica[0]),
+                                        caminho_imagem = caminho_imagem)
             
             else:
                 
-                result_classifica = imagePreprocessing('./imgs/' + file.filename, model_2)
+                result_classifica = imagePreprocessing('./static/img/' + file.filename, model_2)
                 
                 if result_classifica[1] == 0:
                     classe = "Doeça não indeficada"
@@ -120,7 +128,8 @@ def uploadFile():
                 
                 return render_template("classifica_model_2.html",
                                        classe = classe, 
-                                       percet_certeza = int(100*result_classifica[0]))
+                                       percet_certeza = int(100*result_classifica[0]),
+                                        caminho_imagem = caminho_imagem)
                 
             #text_file = open(folder_temp, "w")
             #text_file.write(str(result_classifica))
